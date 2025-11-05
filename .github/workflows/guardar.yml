@@ -1,0 +1,23 @@
+name: Guardar datos de cartilla médica
+
+on:
+  workflow_dispatch:  # Podés ejecutarlo manualmente
+
+jobs:
+  guardar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repo
+        uses: actions/checkout@v4
+
+      - name: Crear archivo con datos
+        run: |
+          echo '{"nombre":"Juan Perez","prestacion":"Odontología"}' > cartilla-medica.json
+
+      - name: Subir cambios a GitHub
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Actualizar datos de afiliados"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
