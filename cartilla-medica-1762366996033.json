@@ -1,0 +1,44 @@
+{
+  "afiliados": [
+    {
+      "id": 1,
+      "nombre": "Juan Pérez",
+      "email": "juan@email.com",
+      "plan": "Básico",
+      "color": "amarillo"
+    },
+    {
+      "id": 2,
+      "nombre": "María García",
+      "email": "maria@email.com",
+      "plan": "Premium",
+      "color": "azul"
+    },
+    {
+      "id": 1762366832259,
+      "nombre": "gabriela",
+      "email": "bernini",
+      "plan": "Básico",
+      "color": "azul"
+    }
+  ],
+  "prestaciones": [
+    {
+      "id": 1,
+      "afiliadoId": 1,
+      "doctor": "Dr. López",
+      "tipo": "Consulta",
+      "fecha": "2025-11-05",
+      "color": "amarillo"
+    },
+    {
+      "id": 2,
+      "afiliadoId": 2,
+      "doctor": "Dra. Martínez",
+      "tipo": "Especialista",
+      "fecha": "2025-11-04",
+      "color": "azul"
+    }
+  ],
+  "fecha": "5/11/2025, 03:23:16"
+}
