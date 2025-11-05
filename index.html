@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cartilla Médica</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    header { text-align: center; color: white; margin-bottom: 40px; padding: 30px; background: rgba(0, 0, 0, 0.2); border-radius: 10px; }
+    header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+    section { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); }
+    h2 { color: #333; margin-bottom: 25px; border-bottom: 3px solid #667eea; padding-bottom: 10px; }
+    h3 { color: #555; margin-bottom: 15px; font-size: 1.1rem; }
+    .form-container { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; }
+    form { display: flex; flex-direction: column; gap: 12px; }
+    input, select, textarea { padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 1rem; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+    button { padding: 12px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    button:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+    .card { padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 5px solid; }
+    .amarillo { background: #fff8e1; border-left-color: #fbc02d; }
+    .azul { background: #e3f2fd; border-left-color: #1976d2; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; }
+    .btn-delete { background: #f44336; color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    .btn-delete:hover { background: #d32f2f; }
+    .search-box { display: flex; align-items: center; background: #f0f0f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 15px; }
+    .search-box input { border: none; background: transparent; flex: 1; padding: 0; }
+    .info-box { background: rgba(255,255,255,0.1); border: 2px solid white; border-radius: 8px; padding: 15px; margin-bottom: 20px; color: white; font-size: 0.9rem; }
+    .results-count { font-size: 0.85rem; color: #999; margin-top: 5px; }
+    @media (max-width: 768px) { main { grid-template-columns: 1fr; } header h1 { font-size: 1.8rem; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function CartillaMedica() {
+      const [afiliados, setAfiliados] = useState([
+        { id: 1, nombre: 'Juan Pérez', email: 'juan@email.com', plan: 'Básico', color: 'amarillo' },
+        { id: 2, nombre: 'María García', email: 'maria@email.com', plan: 'Premium', color: 'azul' }
+      ]);
+
+      const [prestaciones, setPrestaciones] = useState([
+        { id: 1, afiliadoId: 1, doctor: 'Dr. López', tipo: 'Consulta', fecha: '2025-11-05', color: 'amarillo' },
+        { id: 2, afiliadoId: 2, doctor: 'Dra. Martínez', tipo: 'Especialista', fecha: '2025-11-04', color: 'azul' }
+      ]);
+
+      const [nombre, setNombre] = useState('');
+      const [email, setEmail] = useState('');
+      const [plan, setPlan] = useState('Básico');
+      const [colorAf, setColorAf] = useState('amarillo');
+      const [afiliadoSel, setAfiliadoSel] = useState('');
+      const [doctor, setDoctor] = useState('');
+      const [tipo, setTipo] = useState('Consulta');
+      const [fecha, setFecha] = useState('');
+      const [colorPr, setColorPr] = useState('amarillo');
+      const [busquedaAfiliado, setBusquedaAfiliado] = useState('');
+      const [busquedaPrestacion, setBusquedaPrestacion] = useState('');
+
+      useEffect(() => {
+        const datosGuardados = localStorage.getItem('cartillaMedica');
+        if (datosGuardados) {
+          const datos = JSON.parse(datosGuardados);
+          setAfiliados(datos.afiliados);
+          setPrestaciones(datos.prestaciones);
+        }
+      }, []);
+
+      useEffect(() => {
+        localStorage.setItem('cartillaMedica', JSON.stringify({ afiliados, prestaciones }));
+      }, [afiliados, prestaciones]);
+
+      const agregarAfiliado = () => {
+        if (!nombre || !email) { alert('Completa todos los campos'); return; }
+        setAfiliados([...afiliados, { id: Date.now(), nombre, email, plan, color: colorAf }]);
+        setNombre(''); setEmail(''); setPlan('Básico'); setColorAf('amarillo');
+      };
+
+      const eliminarAfiliado = (id) => {
+        setAfiliados(afiliados.filter(a => a.id !== id));
+        setPrestaciones(prestaciones.filter(p => p.afiliadoId !== id));
+      };
+
+      const agregarPrestacion = () => {
+        if (!afiliadoSel || !doctor || !fecha) { alert('Completa todos los campos'); return; }
+        setPrestaciones([...prestaciones, { id: Date.now(), afiliadoId: parseInt(afiliadoSel), doctor, tipo, fecha, color: colorPr }]);
+        setAfiliadoSel(''); setDoctor(''); setTipo('Consulta'); setFecha(''); setColorPr('amarillo');
+      };
+
+      const eliminarPrestacion = (id) => {
+        setPrestaciones(prestaciones.filter(p => p.id !== id));
+      };
+
+      const descargarJSON = () => {
+        const datos = { afiliados, prestaciones, fecha: new Date().toLocaleString('es-AR') };
+        const json = JSON.stringify(datos, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cartilla-medica-${Date.now()}.json`;
+        a.click();
+      };
+
+      const cargarJSON = (e) => {
+        const archivo = e.target.files[0];
+        if (!archivo) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const datos = JSON.parse(event.target.result);
+            setAfiliados(datos.afiliados);
+            setPrestaciones(datos.prestaciones);
+            alert('✅ Datos cargados correctamente');
+          } catch { alert('❌ Error en el archivo'); }
+        };
+        reader.readAsText(archivo);
+      };
+
+      const afiliadosFiltrados = afiliados.filter(af => af.nombre.toLowerCase().includes(busquedaAfiliado.toLowerCase()) || af.email.toLowerCase().includes(busquedaAfiliado.toLowerCase()));
+      const prestacionesFiltradas = prestaciones.filter(pr => {
+        const nombreAf = afiliados.find(a => a.id === pr.afiliadoId)?.nombre || '';
+        return nombreAf.toLowerCase().includes(busquedaPrestacion.toLowerCase()) || pr.doctor.toLowerCase().includes(busquedaPrestacion.toLowerCase()) || pr.tipo.toLowerCase().includes(busquedaPrestacion.toLowerCase());
+      });
+
+      return (
+        <div className="container">
+          <header>
+            <h1>💊 Cartilla Médica</h1>
+            <p>Sistema de Afiliados y Prestaciones</p>
+          </header>
+
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <button onClick={descargarJSON} style={{ marginRight: '10px', background: '#4CAF50' }}>📥 Descargar datos JSON</button>
+            <label style={{ display: 'inline-block', marginLeft: '10px' }}>
+              <button component="span" style={{ background: '#2196F3', cursor: 'pointer' }}>📤 Cargar datos JSON</button>
+              <input type="file" accept=".json" onChange={cargarJSON} style={{ display: 'none' }} />
+            </label>
+          </div>
+
+          <div className="info-box">
+            📍 <strong>¿DÓNDE ESTÁN LOS DATOS?</strong><br/>
+            🔹 Se guardan automáticamente en tu navegador<br/>
+            🔹 Descarga el JSON para tener un backup<br/>
+            🔹 Sube el JSON a GitHub para compartir
+          </div>
+
+          <main>
+            <section>
+              <h2>👥 Afiliados</h2>
+              
+              <div className="search-box">
+                <input type="text" placeholder="🔍 Buscar afiliado..." value={busquedaAfiliado} onChange={(e) => setBusquedaAfiliado(e.target.value)} />
+              </div>
+              <div className="results-count">Resultados: {afiliadosFiltrados.length}</div>
+
+              <div className="form-container">
+                <h3>Agregar Afiliado</h3>
+                <input type="text" placeholder="Nombre completo" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <input type="text" placeholder="Plan" value={plan} onChange={(e) => setPlan(e.target.value)} />
+                <select value={colorAf} onChange={(e) => setColorAf(e.target.value)}>
+                  <option value="amarillo">🟨 Amarillo</option>
+                  <option value="azul">🟦 Azul</option>
+                </select>
+                <button onClick={agregarAfiliado}>➕ Agregar</button>
+              </div>
+
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {afiliadosFiltrados.map(af => (
+                  <div key={af.id} className={`card ${af.color}`}>
+                    <div className="card-header">
+                      <div>
+                        <strong>{af.nombre}</strong><br/>
+                        <small>{af.email}</small><br/>
+                        <small>Plan: {af.plan}</small>
+                      </div>
+                      <button className="btn-delete" onClick={() => eliminarAfiliado(af.id)}>🗑️ Eliminar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <h2>📋 Prestaciones</h2>
+              
+              <div className="search-box">
+                <input type="text" placeholder="🔍 Buscar prestación..." value={busquedaPrestacion} onChange={(e) => setBusquedaPrestacion(e.target.value)} />
+              </div>
+              <div className="results-count">Resultados: {prestacionesFiltradas.length}</div>
+
+              <div className="form-container">
+                <h3>Registrar Prestación</h3>
+                <select value={afiliadoSel} onChange={(e) => setAfiliadoSel(e.target.value)}>
+                  <option value="">Seleccionar Afiliado</option>
+                  {afiliados.map(af => <option key={af.id} value={af.id}>{af.nombre}</option>)}
+                </select>
+                <input type="text" placeholder="Tipo de prestación" value={tipo} onChange={(e) => setTipo(e.target.value)} />
+                <input type="text" placeholder="Doctor" value={doctor} onChange={(e) => setDoctor(e.target.value)} />
+                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                <select value={colorPr} onChange={(e) => setColorPr(e.target.value)}>
+                  <option value="amarillo">🟨 Amarillo</option>
+                  <option value="azul">🟦 Azul</option>
+                </select>
+                <button onClick={agregarPrestacion}>➕ Registrar</button>
+              </div>
+
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {prestacionesFiltradas.map(pr => (
+                  <div key={pr.id} className={`card ${pr.color}`}>
+                    <div className="card-header">
+                      <div>
+                        <strong>{afiliados.find(a => a.id === pr.afiliadoId)?.nombre}</strong><br/>
+                        <small>{pr.tipo} - {pr.doctor}</small><br/>
+                        <small>{new Date(pr.fecha).toLocaleDateString('es-AR')}</small>
+                      </div>
+                      <button className="btn-delete" onClick={() => eliminarPrestacion(pr.id)}>🗑️ Eliminar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<CartillaMedica />, document.getElementById('root'));
+  </script>
+</body>
+</html>
