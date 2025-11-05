@@ -1,7 +1,7 @@
 name: Guardar datos de cartilla médica
 
 on:
-  workflow_dispatch:  # Podés ejecutarlo manualmente
+  workflow_dispatch:  # Se ejecuta manualmente
 
 jobs:
   guardar:
@@ -20,4 +20,4 @@ jobs:
         with:
           commit_message: "Actualizar datos de afiliados"
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
