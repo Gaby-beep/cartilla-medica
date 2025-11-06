@@ -98,7 +98,7 @@ export default async function handler(request, response) {
     const putResponse = await fetch(REPO_URL, {
       method: 'PUT',
       headers: {
-        'Authorization': `token ${token}`,
+        'Authorization': `token ${GITHUB_TOKEN}`,
         'Accept': 'application/vnd.github.v3+json',
         'User-Agent': 'Gaby-beep-App'
       },
