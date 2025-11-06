@@ -15,6 +15,13 @@
       "email": "d.rote@gmail.com",
       "plan": "Básico",
       "color": "amarillo"
+    },
+    {
+      "id": 1762457596753,
+      "nombre": "Graciela Ledesmo",
+      "email": "gledesmo@gmail.com",
+      "plan": "Básico",
+      "color": "amarillo"
     }
   ],
   "prestaciones": []
