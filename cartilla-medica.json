@@ -1,6 +1,14 @@
 {
   "nombre": "Juan Perez",
   "prestacion": "Odontología",
-  "afiliados": [],
+  "afiliados": [
+    {
+      "id": 1762454221424,
+      "nombre": "Cele.coll",
+      "email": "c.coll@gmail.com",
+      "plan": "Básico",
+      "color": "azul"
+    }
+  ],
   "prestaciones": []
 }
