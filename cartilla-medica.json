@@ -24,5 +24,14 @@
       "color": "amarillo"
     }
   ],
-  "prestaciones": []
+  "prestaciones": [
+    {
+      "id": 1762459065266,
+      "afiliadoId": 1762454221424,
+      "doctor": "Robstein",
+      "tipo": "Consulta",
+      "fecha": "2025-11-26",
+      "color": "azul"
+    }
+  ]
 }
