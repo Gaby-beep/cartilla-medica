@@ -1,15 +1,14 @@
-// Este es el "puente" que se ejecuta en Vercel
+// Este es el "puente" MEJORADO
 // Nombre del archivo: /api/guardar-datos.js
 
 export default async function handler(request, response) {
-  // Solo permitir peticiones POST
   if (request.method !== 'POST') {
     return response.status(405).json({ message: 'Método no permitido' });
   }
 
   try {
-    const nuevoDato = request.body; // Los datos del afiliado que envía la página
-    const GITHUB_TOKEN = process.env.GITHUB_TOKEN; // El token que guardaste en Vercel
+    const paquete = request.body; // El paquete que envía React
+    const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
     const REPO_URL = 'https://api.github.com/repos/Gaby-beep/cartilla-medica/contents/cartilla-medica.json';
 
     // --- Paso 1: Obtener el archivo actual de GitHub ---
@@ -22,102 +21,89 @@ export default async function handler(request, response) {
       },
     });
 
-    if (!getFileResponse.ok) {
-      if (getFileResponse.status === 404) {
-        // Si no existe, crearemos uno nuevo
-        console.log('Archivo no encontrado, se creará uno nuevo.');
-        const datosIniciales = { afiliados: [], prestaciones: [] };
-        
-        if (nuevoDato.tipo === 'afiliado') {
-          datosIniciales.afiliados.push(nuevoDato.data);
-        } else if (nuevoDato.tipo === 'prestacion') {
-          datosIniciales.prestaciones.push(nuevoDato.data);
-        }
+    let datosActuales = { afiliados: [], prestaciones: [] };
+    let fileSha = null;
 
-        const crearArchivoResponse = await crearOActualizarArchivo(
-          REPO_URL,
-          GITHUB_TOKEN,
-          datosIniciales,
-          'Crear cartilla-medica.json inicial',
-          null
-        );
-
-        return response.status(201).json({ message: 'Datos guardados (archivo creado)', data: crearArchivoResponse });
-      
-      } else {
-        throw new Error(`Error al obtener el archivo: ${getFileResponse.statusText}`);
+    if (getFileResponse.ok) {
+      const fileData = await getFileResponse.json();
+      fileSha = fileData.sha;
+      try {
+        const fileContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
+        datosActuales = JSON.parse(fileContent);
+      } catch (e) {
+        console.log("JSON vacío o corrupto, iniciando de nuevo.");
       }
+    } else if (getFileResponse.status !== 404) {
+      // Si no es "No Encontrado", es un error real
+      throw new Error(`Error al obtener el archivo: ${getFileResponse.statusText}`);
     }
+    // Si es 404, simplemente usamos datosActuales vacío y fileSha=null
 
-    const fileData = await getFileResponse.json();
-    const fileContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
-    const fileSha = fileData.sha;
-    let datosActuales;
-    
-    try {
-      datosActuales = JSON.parse(fileContent);
-    } catch (e) {
-      // Si el JSON está vacío o corrupto, empezamos de nuevo
-      datosActuales = { afiliados: [], prestaciones: [] };
-    }
-
-    // --- Paso 2: Modificar los datos ---
+    // Asegurarnos que las listas existan
     if (!datosActuales.afiliados) datosActuales.afiliados = [];
     if (!datosActuales.prestaciones) datosActuales.prestaciones = [];
 
-    if (nuevoDato.tipo === 'afiliado') {
-      datosActuales.afiliados.push(nuevoDato.data);
-    } else if (nuevoDato.tipo === 'prestacion') {
-      datosActuales.prestaciones.push(nuevoDato.data);
-    } else {
-      return response.status(400).json({ message: 'Tipo de dato no reconocido' });
+    // --- Paso 2: Modificar los datos según el "tipo" del paquete ---
+    let mensajeCommit = 'Actualizar datos de la cartilla';
+    
+    switch (paquete.tipo) {
+      case 'agregar_afiliado':
+        datosActuales.afiliados.push(paquete.data);
+        mensajeCommit = 'Agregar nuevo afiliado';
+        break;
+      case 'agregar_prestacion':
+        datosActuales.prestaciones.push(paquete.data);
+        mensajeCommit = 'Agregar nueva prestación';
+        break;
+      case 'eliminar_afiliado':
+        datosActuales.afiliados = datosActuales.afiliados.filter(a => a.id !== paquete.data.id);
+        // Borrar también sus prestaciones
+        datosActuales.prestaciones = datosActuales.prestaciones.filter(p => p.afiliadoId !== paquete.data.id);
+        mensajeCommit = 'Eliminar afiliado';
+        break;
+      case 'eliminar_prestacion':
+        datosActuales.prestaciones = datosActuales.prestaciones.filter(p => p.id !== paquete.data.id);
+        mensajeCommit = 'Eliminar prestación';
+        break;
+      default:
+        return response.status(400).json({ message: 'Tipo de acción no reconocida' });
     }
 
     // --- Paso 3: Subir el archivo actualizado a GitHub ---
-    const actualizarArchivoResponse = await crearOActualizarArchivo(
-      REPO_URL,
-      GITHUB_TOKEN,
-      datosActuales,
-      `Actualizar datos (nuevo ${nuevoDato.tipo})`,
-      fileSha
-    );
+    const contenidoCodificado = Buffer.from(JSON.stringify(datosActuales, null, 2)).toString('base64');
+    
+    const putBody = {
+      message: mensajeCommit,
+      content: contenidoCodificado,
+      branch: 'main',
+    };
+    
+    // El SHA es VITAL. Si no lo pasamos en una actualización, falla.
+    // Si es un archivo nuevo (fileSha es null), no lo incluimos.
+    if (fileSha) {
+      putBody.sha = fileSha;
+    }
 
-    response.status(200).json({ message: 'Datos guardados con éxito', data: actualizarArchivoResponse });
+    const putResponse = await fetch(REPO_URL, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Gaby-beep-App'
+      },
+      body: JSON.stringify(putBody),
+    });
+
+    if (!putResponse.ok) {
+      const errorData = await putResponse.json();
+      throw new Error(`Error al guardar en GitHub: ${putResponse.statusText} - ${errorData.message}`);
+    }
+
+    const data = await putResponse.json();
+    response.status(200).json({ message: 'Datos guardados con éxito', data });
 
   } catch (error) {
     console.error(error);
     response.status(500).json({ message: 'Error interno del servidor', error: error.message });
   }
-}
-
-
-// Función ayudante para crear o actualizar el archivo en GitHub
-async function crearOActualizarArchivo(url, token, datos, mensajeCommit, sha) {
-  const contenidoCodificado = Buffer.from(JSON.stringify(datos, null, 2)).toString('base64');
-
-  const body = {
-    message: mensajeCommit,
-    content: contenidoCodificado,
-    branch: 'main', // Asegúrate que tu rama principal se llame 'main'
-  };
-
-  if (sha) {
-    body.sha = sha;
-  }
-
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `token ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Gaby-beep-App'
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Error al guardar en GitHub: ${response.statusText} - ${errorData.message}`);
-  }
-  return await response.json();
 }
