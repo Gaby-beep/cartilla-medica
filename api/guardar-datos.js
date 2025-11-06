@@ -1,4 +1,4 @@
-// Este es el "puente" MEJORADO
+// Este es el "puente" MEJORADO CON CONTRASEÑA
 // Nombre del archivo: /api/guardar-datos.js
 
 export default async function handler(request, response) {
@@ -8,7 +8,20 @@ export default async function handler(request, response) {
 
   try {
     const paquete = request.body; // El paquete que envía React
+    
+    // --- ⬇️ NUEVA SECCIÓN DE SEGURIDAD ⬇️ ---
     const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+    const APP_PASSWORD = process.env.APP_PASSWORD; // La clave que guardaste en Vercel
+    
+    // Verificamos si la contraseña existe y si la que mandó el usuario es correcta
+    if (!APP_PASSWORD || !paquete.appPassword || paquete.appPassword !== APP_PASSWORD) {
+      // Si la contraseña guardada en Vercel no existe, o si el usuario no mandó una,
+      // o si la que mandó es incorrecta...
+      return response.status(401).json({ message: 'Contraseña de app incorrecta' });
+    }
+    // --- ⬆️ FIN DE LA SECCIÓN DE SEGURIDAD ⬆️ ---
+
+
     const REPO_URL = 'https://api.github.com/repos/Gaby-beep/cartilla-medica/contents/cartilla-medica.json';
 
     // --- Paso 1: Obtener el archivo actual de GitHub ---
@@ -29,7 +42,6 @@ export default async function handler(request, response) {
       fileSha = fileData.sha;
       try {
         const fileContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
-        // Evitar que un archivo vacío rompa el JSON.parse
         if (fileContent) {
           datosActuales = JSON.parse(fileContent);
         }
@@ -37,14 +49,11 @@ export default async function handler(request, response) {
         console.log("JSON vacío o corrupto, iniciando de nuevo.");
       }
     } else if (getFileResponse.status !== 404) {
-      // Si no es "No Encontrado", es un error real
       const errorData = await getFileResponse.json();
       console.error('Error al obtener archivo de GitHub:', errorData);
       throw new Error(`Error al obtener el archivo: ${getFileResponse.statusText}`);
     }
-    // Si es 404, simplemente usamos datosActuales vacío y fileSha=null
 
-    // Asegurarnos que las listas existan
     if (!datosActuales.afiliados) datosActuales.afiliados = [];
     if (!datosActuales.prestaciones) datosActuales.prestaciones = [];
 
@@ -62,7 +71,6 @@ export default async function handler(request, response) {
         break;
       case 'eliminar_afiliado':
         datosActuales.afiliados = datosActuales.afiliados.filter(a => a.id !== paquete.data.id);
-        // Borrar también sus prestaciones
         datosActuales.prestaciones = datosActuales.prestaciones.filter(p => p.afiliadoId !== paquete.data.id);
         mensajeCommit = 'Eliminar afiliado';
         break;
@@ -83,8 +91,6 @@ export default async function handler(request, response) {
       branch: 'main',
     };
     
-    // El SHA es VITAL. Si no lo pasamos en una actualización, falla.
-    // Si es un archivo nuevo (fileSha es null), no lo incluimos.
     if (fileSha) {
       putBody.sha = fileSha;
     }
@@ -92,7 +98,7 @@ export default async function handler(request, response) {
     const putResponse = await fetch(REPO_URL, {
       method: 'PUT',
       headers: {
-        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Authorization': `token ${token}`,
         'Accept': 'application/vnd.github.v3+json',
         'User-Agent': 'Gaby-beep-App'
       },
@@ -113,4 +119,3 @@ export default async function handler(request, response) {
     response.status(500).json({ message: 'Error interno del servidor', error: error.message });
   }
 }
-   
