@@ -8,6 +8,13 @@
       "email": "c.coll@gmail.com",
       "plan": "Básico",
       "color": "azul"
+    },
+    {
+      "id": 1762455332204,
+      "nombre": "Dario Rote",
+      "email": "d.rote@gmail.com",
+      "plan": "Básico",
+      "color": "amarillo"
     }
   ],
   "prestaciones": []
