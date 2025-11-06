@@ -35,6 +35,20 @@
     .search-box input { border: none; background: transparent; flex: 1; padding: 0; }
     .info-box { background: rgba(255,255,255,0.1); border: 2px solid white; border-radius: 8px; padding: 15px; margin-bottom: 20px; color: white; font-size: 0.9rem; }
     .results-count { font-size: 0.85rem; color: #999; margin-top: 5px; }
+    /* Estilo para el nuevo panel de contraseña */
+    .password-panel {
+        background: #fff8e1; /* Amarillo pálido */
+        color: #6d4c0d;
+        border: 2px solid #fbc02d;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    .password-panel input {
+        width: 100%;
+        margin-top: 10px;
+    }
+
     @media (max-width: 768px) { main { grid-template-columns: 1fr; } header h1 { font-size: 1.8rem; } }
   </style>
 </head>
@@ -64,19 +78,19 @@
       const [busquedaAfiliado, setBusquedaAfiliado] = useState('');
       const [busquedaPrestacion, setBusquedaPrestacion] = useState('');
 
+      // --- ⬇️ NUEVO ESTADO DE SEGURIDAD ⬇️ ---
+      const [appPassword, setAppPassword] = useState(''); // Estado para guardar la contraseña que escribe el usuario
+
       // --- Estados de Carga ---
-      const [isLoading, setIsLoading] = useState(true); // Para la carga inicial
-      const [isSaving, setIsSaving] = useState(false); // Para deshabilitar botones al guardar
+      const [isLoading, setIsLoading] = useState(true);
+      const [isSaving, setIsSaving] = useState(false);
 
       // --- EFECTO 1: Cargar datos desde GitHub al iniciar la app ---
       useEffect(() => {
         setIsLoading(true);
-        // Intentamos cargar el JSON público que está en Vercel
-        // Usamos un 'cache-buster' (el ?v=...) para asegurarnos de que traiga el archivo actualizado
         fetch(`/cartilla-medica.json?v=${Date.now()}`)
           .then(res => {
             if (res.ok) return res.json();
-            // Si no existe (404), empezamos con datos vacíos
             if (res.status === 404) return { afiliados: [], prestaciones: [] };
             throw new Error('No se pudo cargar el JSON');
           })
@@ -86,15 +100,25 @@
           })
           .catch(err => {
             console.error(err);
-            alert('Error al cargar datos iniciales. Empezando en blanco.');
-            setAfiliados([]); // Empezar vacío si todo falla
+            alert('Error al cargar datos iniciales.');
+            setAfiliados([]);
             setPrestaciones([]);
           })
           .finally(() => setIsLoading(false));
-      }, []); // El array vacío [] significa que se ejecuta 1 sola vez al cargar
+      }, []);
 
-      // --- Función genérica para llamar a nuestra API ---
+      // --- ⬇️ FUNCIÓN MODIFICADA CON CONTRASEÑA ⬇️ ---
       const guardarEnGitHub = async (paquete) => {
+        
+        // 1. Verificamos si el usuario escribió la contraseña en el campo
+        if (!appPassword) {
+          alert('Por favor, ingresa la contraseña de administrador para guardar cambios.');
+          return null; // Detiene la función
+        }
+        
+        // 2. Si la escribió, la "adjuntamos" al paquete que viaja al servidor
+        paquete.appPassword = appPassword; 
+
         setIsSaving(true);
         try {
           const response = await fetch('/api/guardar-datos', {
@@ -104,34 +128,35 @@
           });
           
           if (!response.ok) {
+            // Si el error es 401, significa "Contraseña Incorrecta"
+            if (response.status === 401) {
+                throw new Error('¡Contraseña de administrador incorrecta!');
+            }
             const errorData = await response.json();
             throw new Error(errorData.message || 'Error del servidor');
           }
           
-          return await response.json(); // Devuelve éxito
+          return await response.json();
 
         } catch (error) {
           console.error('Error al guardar:', error);
           alert('No se pudo guardar el cambio: ' + error.message);
-          return null; // Devuelve fallo
+          return null;
         
         } finally {
           setIsSaving(false);
         }
       };
 
-      // --- Funciones de la App (Ahora conectadas a la API) ---
+      // --- Funciones de la App (No necesitan más cambios) ---
 
       const agregarAfiliado = async () => {
         if (!nombre || !email) { alert('Completa todos los campos'); return; }
-        
         const nuevoAfiliado = { id: Date.now(), nombre, email, plan, color: colorAf };
         const paquete = { tipo: 'agregar_afiliado', data: nuevoAfiliado };
-        
         const resultado = await guardarEnGitHub(paquete);
         
         if (resultado) {
-          // Éxito: Actualizar estado local y limpiar formulario
           setAfiliados([...afiliados, nuevoAfiliado]);
           setNombre(''); setEmail(''); setPlan('Básico'); setColorAf('amarillo');
         }
@@ -139,12 +164,10 @@
 
       const eliminarAfiliado = async (id) => {
         if (!confirm('¿Seguro que quieres eliminar este afiliado? También se borrarán sus prestaciones.')) return;
-
         const paquete = { tipo: 'eliminar_afiliado', data: { id } };
         const resultado = await guardarEnGitHub(paquete);
         
         if (resultado) {
-          // Éxito: Actualizar estado local
           setAfiliados(afiliados.filter(a => a.id !== id));
           setPrestaciones(prestaciones.filter(p => p.afiliadoId !== id));
         }
@@ -152,14 +175,11 @@
 
       const agregarPrestacion = async () => {
         if (!afiliadoSel || !doctor || !fecha) { alert('Completa todos los campos'); return; }
-        
         const nuevaPrestacion = { id: Date.now(), afiliadoId: parseInt(afiliadoSel), doctor, tipo, fecha, color: colorPr };
         const paquete = { tipo: 'agregar_prestacion', data: nuevaPrestacion };
-        
         const resultado = await guardarEnGitHub(paquete);
 
         if (resultado) {
-          // Éxito: Actualizar estado local
           setPrestaciones([...prestaciones, nuevaPrestacion]);
           setAfiliadoSel(''); setDoctor(''); setTipo('Consulta'); setFecha(''); setColorPr('amarillo');
         }
@@ -167,12 +187,10 @@
 
       const eliminarPrestacion = async (id) => {
         if (!confirm('¿Seguro que quieres eliminar esta prestación?')) return;
-        
         const paquete = { tipo: 'eliminar_prestacion', data: { id } };
         const resultado = await guardarEnGitHub(paquete);
         
         if (resultado) {
-          // Éxito: Actualizar estado local
           setPrestaciones(prestaciones.filter(p => p.id !== id));
         }
       };
@@ -197,24 +215,23 @@
           try {
             const datos = JSON.parse(event.target.result);
             if (!datos.afiliados || !datos.prestaciones) throw new Error('Formato incorrecto');
-            if (confirm('¿Estás seguro? Esto reemplazará los datos actuales por los del archivo. Los cambios se guardarán en GitHub.')) {
+            if (confirm('¿Estás seguro? Esto reemplazará los datos locales. Deberás hacer un cambio (ej. agregar un afiliado) para guardar esto en la nube.')) {
               setAfiliados(datos.afiliados);
               setPrestaciones(datos.prestaciones);
-              alert('✅ Datos cargados localmente. Agrega o elimina algo para forzar el guardado en la nube.');
+              alert('✅ Datos cargados localmente.');
             }
           } catch { alert('❌ Error en el archivo'); }
         };
         reader.readAsText(archivo);
       };
 
-      // --- Lógica de Filtros (No cambia) ---
+      // --- Lógica de Filtros ---
       const afiliadosFiltrados = afiliados.filter(af => af.nombre.toLowerCase().includes(busquedaAfiliado.toLowerCase()) || af.email.toLowerCase().includes(busquedaAfiliado.toLowerCase()));
       const prestacionesFiltradas = prestaciones.filter(pr => {
         const nombreAf = afiliados.find(a => a.id === pr.afiliadoId)?.nombre || '';
         return nombreAf.toLowerCase().includes(busquedaPrestacion.toLowerCase()) || pr.doctor.toLowerCase().includes(busquedaPrestacion.toLowerCase()) || pr.tipo.toLowerCase().includes(busquedaPrestacion.toLowerCase());
       });
       
-      // --- Mostrar "Cargando..." ---
       if (isLoading) {
         return <h1 style={{color: 'white', textAlign: 'center'}}>Cargando datos...</h1>;
       }
@@ -227,6 +244,18 @@
             <p>Sistema de Afiliados y Prestaciones (Conectado a GitHub)</p>
           </header>
 
+          {/* */}
+          <div className="password-panel">
+            <h3>🔒 Panel de Administrador</h3>
+            <p style={{fontSize: '0.9rem', marginBottom: '10px'}}>Para AGREGAR o ELIMINAR datos, escribe tu contraseña aquí:</p>
+            <input 
+              type="password" 
+              placeholder="Escribe tu contraseña de APP_PASSWORD..." 
+              value={appPassword} 
+              onChange={(e) => setAppPassword(e.target.value)} 
+            />
+          </div>
+
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
             <button onClick={descargarJSON} style={{ marginRight: '10px', background: '#4CAF50' }} disabled={isSaving}>📥 Descargar Backup</button>
             <label style={{ display: 'inline-block', marginLeft: '10px' }}>
@@ -237,19 +266,17 @@
 
           <div className="info-box">
             📍 <strong>¡DATOS EN LA NUBE!</strong><br/>
-            🔹 Los cambios se guardan automáticamente en GitHub.<br/>
+            🔹 Los cambios se guardan automáticamente en GitHub (si pones la contraseña).<br/>
             🔹 Usa los botones de arriba para backups locales.
           </div>
 
           <main>
             <section>
               <h2>👥 Afiliados</h2>
-              
               <div className="search-box">
                 <input type="text" placeholder="🔍 Buscar afiliado..." value={busquedaAfiliado} onChange={(e) => setBusquedaAfiliado(e.target.value)} />
               </div>
               <div className="results-count">Resultados: {afiliadosFiltrados.length}</div>
-
               <div className="form-container">
                 <h3>Agregar Afiliado</h3>
                 <input type="text" placeholder="Nombre completo" value={nombre} onChange={(e) => setNombre(e.target.value)} disabled={isSaving} />
@@ -263,7 +290,6 @@
                   {isSaving ? 'Guardando...' : '➕ Agregar'}
                 </button>
               </div>
-
               <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                 {afiliadosFiltrados.map(af => (
                   <div key={af.id} className={`card ${af.color}`}>
@@ -282,12 +308,10 @@
 
             <section>
               <h2>📋 Prestaciones</h2>
-              
               <div className="search-box">
                 <input type="text" placeholder="🔍 Buscar prestación..." value={busquedaPrestacion} onChange={(e) => setBusquedaPrestacion(e.target.value)} />
               </div>
               <div className="results-count">Resultados: {prestacionesFiltradas.length}</div>
-
               <div className="form-container">
                 <h3>Registrar Prestación</h3>
                 <select value={afiliadoSel} onChange={(e) => setAfiliadoSel(e.target.value)} disabled={isSaving}>
@@ -305,7 +329,6 @@
                   {isSaving ? 'Guardando...' : '➕ Registrar'}
                 </button>
               </div>
-
               <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                 {prestacionesFiltradas.map(pr => (
                   <div key={pr.id} className={`card ${pr.color}`}>
