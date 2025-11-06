@@ -23,12 +23,14 @@
     input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
     button { padding: 12px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
     button:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+    button:disabled { background: #999; cursor: not-allowed; transform: none; box-shadow: none; }
     .card { padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 5px solid; }
     .amarillo { background: #fff8e1; border-left-color: #fbc02d; }
     .azul { background: #e3f2fd; border-left-color: #1976d2; }
     .card-header { display: flex; justify-content: space-between; align-items: center; }
     .btn-delete { background: #f44336; color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
     .btn-delete:hover { background: #d32f2f; }
+    .btn-delete:disabled { background: #aaa; }
     .search-box { display: flex; align-items: center; background: #f0f0f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 15px; }
     .search-box input { border: none; background: transparent; flex: 1; padding: 0; }
     .info-box { background: rgba(255,255,255,0.1); border: 2px solid white; border-radius: 8px; padding: 15px; margin-bottom: 20px; color: white; font-size: 0.9rem; }
@@ -43,62 +45,139 @@
     const { useState, useEffect } = React;
 
     function CartillaMedica() {
-      const [afiliados, setAfiliados] = useState([
-        { id: 1, nombre: 'Juan Pérez', email: 'juan@email.com', plan: 'Básico', color: 'amarillo' },
-        { id: 2, nombre: 'María García', email: 'maria@email.com', plan: 'Premium', color: 'azul' }
-      ]);
+      // --- Estados de Datos ---
+      const [afiliados, setAfiliados] = useState([]);
+      const [prestaciones, setPrestaciones] = useState([]);
 
-      const [prestaciones, setPrestaciones] = useState([
-        { id: 1, afiliadoId: 1, doctor: 'Dr. López', tipo: 'Consulta', fecha: '2025-11-05', color: 'amarillo' },
-        { id: 2, afiliadoId: 2, doctor: 'Dra. Martínez', tipo: 'Especialista', fecha: '2025-11-04', color: 'azul' }
-      ]);
-
+      // --- Estados de Formularios ---
       const [nombre, setNombre] = useState('');
       const [email, setEmail] = useState('');
       const [plan, setPlan] = useState('Básico');
       const [colorAf, setColorAf] = useState('amarillo');
+      
       const [afiliadoSel, setAfiliadoSel] = useState('');
       const [doctor, setDoctor] = useState('');
       const [tipo, setTipo] = useState('Consulta');
       const [fecha, setFecha] = useState('');
       const [colorPr, setColorPr] = useState('amarillo');
+      
       const [busquedaAfiliado, setBusquedaAfiliado] = useState('');
       const [busquedaPrestacion, setBusquedaPrestacion] = useState('');
 
+      // --- Estados de Carga ---
+      const [isLoading, setIsLoading] = useState(true); // Para la carga inicial
+      const [isSaving, setIsSaving] = useState(false); // Para deshabilitar botones al guardar
+
+      // --- EFECTO 1: Cargar datos desde GitHub al iniciar la app ---
       useEffect(() => {
-        const datosGuardados = localStorage.getItem('cartillaMedica');
-        if (datosGuardados) {
-          const datos = JSON.parse(datosGuardados);
-          setAfiliados(datos.afiliados);
-          setPrestaciones(datos.prestaciones);
+        setIsLoading(true);
+        // Intentamos cargar el JSON público que está en Vercel
+        // Usamos un 'cache-buster' (el ?v=...) para asegurarnos de que traiga el archivo actualizado
+        fetch(`/cartilla-medica.json?v=${Date.now()}`)
+          .then(res => {
+            if (res.ok) return res.json();
+            // Si no existe (404), empezamos con datos vacíos
+            if (res.status === 404) return { afiliados: [], prestaciones: [] };
+            throw new Error('No se pudo cargar el JSON');
+          })
+          .then(data => {
+            setAfiliados(data.afiliados || []);
+            setPrestaciones(data.prestaciones || []);
+          })
+          .catch(err => {
+            console.error(err);
+            alert('Error al cargar datos iniciales. Empezando en blanco.');
+            setAfiliados([]); // Empezar vacío si todo falla
+            setPrestaciones([]);
+          })
+          .finally(() => setIsLoading(false));
+      }, []); // El array vacío [] significa que se ejecuta 1 sola vez al cargar
+
+      // --- Función genérica para llamar a nuestra API ---
+      const guardarEnGitHub = async (paquete) => {
+        setIsSaving(true);
+        try {
+          const response = await fetch('/api/guardar-datos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(paquete),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Error del servidor');
+          }
+          
+          return await response.json(); // Devuelve éxito
+
+        } catch (error) {
+          console.error('Error al guardar:', error);
+          alert('No se pudo guardar el cambio: ' + error.message);
+          return null; // Devuelve fallo
+        
+        } finally {
+          setIsSaving(false);
         }
-      }, []);
+      };
 
-      useEffect(() => {
-        localStorage.setItem('cartillaMedica', JSON.stringify({ afiliados, prestaciones }));
-      }, [afiliados, prestaciones]);
+      // --- Funciones de la App (Ahora conectadas a la API) ---
 
-      const agregarAfiliado = () => {
+      const agregarAfiliado = async () => {
         if (!nombre || !email) { alert('Completa todos los campos'); return; }
-        setAfiliados([...afiliados, { id: Date.now(), nombre, email, plan, color: colorAf }]);
-        setNombre(''); setEmail(''); setPlan('Básico'); setColorAf('amarillo');
+        
+        const nuevoAfiliado = { id: Date.now(), nombre, email, plan, color: colorAf };
+        const paquete = { tipo: 'agregar_afiliado', data: nuevoAfiliado };
+        
+        const resultado = await guardarEnGitHub(paquete);
+        
+        if (resultado) {
+          // Éxito: Actualizar estado local y limpiar formulario
+          setAfiliados([...afiliados, nuevoAfiliado]);
+          setNombre(''); setEmail(''); setPlan('Básico'); setColorAf('amarillo');
+        }
       };
 
-      const eliminarAfiliado = (id) => {
-        setAfiliados(afiliados.filter(a => a.id !== id));
-        setPrestaciones(prestaciones.filter(p => p.afiliadoId !== id));
+      const eliminarAfiliado = async (id) => {
+        if (!confirm('¿Seguro que quieres eliminar este afiliado? También se borrarán sus prestaciones.')) return;
+
+        const paquete = { tipo: 'eliminar_afiliado', data: { id } };
+        const resultado = await guardarEnGitHub(paquete);
+        
+        if (resultado) {
+          // Éxito: Actualizar estado local
+          setAfiliados(afiliados.filter(a => a.id !== id));
+          setPrestaciones(prestaciones.filter(p => p.afiliadoId !== id));
+        }
       };
 
-      const agregarPrestacion = () => {
+      const agregarPrestacion = async () => {
         if (!afiliadoSel || !doctor || !fecha) { alert('Completa todos los campos'); return; }
-        setPrestaciones([...prestaciones, { id: Date.now(), afiliadoId: parseInt(afiliadoSel), doctor, tipo, fecha, color: colorPr }]);
-        setAfiliadoSel(''); setDoctor(''); setTipo('Consulta'); setFecha(''); setColorPr('amarillo');
+        
+        const nuevaPrestacion = { id: Date.now(), afiliadoId: parseInt(afiliadoSel), doctor, tipo, fecha, color: colorPr };
+        const paquete = { tipo: 'agregar_prestacion', data: nuevaPrestacion };
+        
+        const resultado = await guardarEnGitHub(paquete);
+
+        if (resultado) {
+          // Éxito: Actualizar estado local
+          setPrestaciones([...prestaciones, nuevaPrestacion]);
+          setAfiliadoSel(''); setDoctor(''); setTipo('Consulta'); setFecha(''); setColorPr('amarillo');
+        }
       };
 
-      const eliminarPrestacion = (id) => {
-        setPrestaciones(prestaciones.filter(p => p.id !== id));
+      const eliminarPrestacion = async (id) => {
+        if (!confirm('¿Seguro que quieres eliminar esta prestación?')) return;
+        
+        const paquete = { tipo: 'eliminar_prestacion', data: { id } };
+        const resultado = await guardarEnGitHub(paquete);
+        
+        if (resultado) {
+          // Éxito: Actualizar estado local
+          setPrestaciones(prestaciones.filter(p => p.id !== id));
+        }
       };
 
+      // --- Lógica de Descarga/Carga (Backup local) ---
       const descargarJSON = () => {
         const datos = { afiliados, prestaciones, fecha: new Date().toLocaleString('es-AR') };
         const json = JSON.stringify(datos, null, 2);
@@ -117,40 +196,49 @@
         reader.onload = (event) => {
           try {
             const datos = JSON.parse(event.target.result);
-            setAfiliados(datos.afiliados);
-            setPrestaciones(datos.prestaciones);
-            alert('✅ Datos cargados correctamente');
+            if (!datos.afiliados || !datos.prestaciones) throw new Error('Formato incorrecto');
+            if (confirm('¿Estás seguro? Esto reemplazará los datos actuales por los del archivo. Los cambios se guardarán en GitHub.')) {
+              setAfiliados(datos.afiliados);
+              setPrestaciones(datos.prestaciones);
+              alert('✅ Datos cargados localmente. Agrega o elimina algo para forzar el guardado en la nube.');
+            }
           } catch { alert('❌ Error en el archivo'); }
         };
         reader.readAsText(archivo);
       };
 
+      // --- Lógica de Filtros (No cambia) ---
       const afiliadosFiltrados = afiliados.filter(af => af.nombre.toLowerCase().includes(busquedaAfiliado.toLowerCase()) || af.email.toLowerCase().includes(busquedaAfiliado.toLowerCase()));
       const prestacionesFiltradas = prestaciones.filter(pr => {
         const nombreAf = afiliados.find(a => a.id === pr.afiliadoId)?.nombre || '';
         return nombreAf.toLowerCase().includes(busquedaPrestacion.toLowerCase()) || pr.doctor.toLowerCase().includes(busquedaPrestacion.toLowerCase()) || pr.tipo.toLowerCase().includes(busquedaPrestacion.toLowerCase());
       });
+      
+      // --- Mostrar "Cargando..." ---
+      if (isLoading) {
+        return <h1 style={{color: 'white', textAlign: 'center'}}>Cargando datos...</h1>;
+      }
 
+      // --- El HTML (JSX) ---
       return (
         <div className="container">
           <header>
             <h1>💊 Cartilla Médica</h1>
-            <p>Sistema de Afiliados y Prestaciones</p>
+            <p>Sistema de Afiliados y Prestaciones (Conectado a GitHub)</p>
           </header>
 
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <button onClick={descargarJSON} style={{ marginRight: '10px', background: '#4CAF50' }}>📥 Descargar datos JSON</button>
+            <button onClick={descargarJSON} style={{ marginRight: '10px', background: '#4CAF50' }} disabled={isSaving}>📥 Descargar Backup</button>
             <label style={{ display: 'inline-block', marginLeft: '10px' }}>
-              <button component="span" style={{ background: '#2196F3', cursor: 'pointer' }}>📤 Cargar datos JSON</button>
-              <input type="file" accept=".json" onChange={cargarJSON} style={{ display: 'none' }} />
+              <button component="span" style={{ background: '#2196F3', cursor: 'pointer' }} disabled={isSaving}>📤 Cargar Backup</button>
+              <input type="file" accept=".json" onChange={cargarJSON} style={{ display: 'none' }} disabled={isSaving} />
             </label>
           </div>
 
           <div className="info-box">
-            📍 <strong>¿DÓNDE ESTÁN LOS DATOS?</strong><br/>
-            🔹 Se guardan automáticamente en tu navegador<br/>
-            🔹 Descarga el JSON para tener un backup<br/>
-            🔹 Sube el JSON a GitHub para compartir
+            📍 <strong>¡DATOS EN LA NUBE!</strong><br/>
+            🔹 Los cambios se guardan automáticamente en GitHub.<br/>
+            🔹 Usa los botones de arriba para backups locales.
           </div>
 
           <main>
@@ -164,14 +252,16 @@
 
               <div className="form-container">
                 <h3>Agregar Afiliado</h3>
-                <input type="text" placeholder="Nombre completo" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                <input type="text" placeholder="Plan" value={plan} onChange={(e) => setPlan(e.target.value)} />
-                <select value={colorAf} onChange={(e) => setColorAf(e.target.value)}>
+                <input type="text" placeholder="Nombre completo" value={nombre} onChange={(e) => setNombre(e.target.value)} disabled={isSaving} />
+                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isSaving} />
+                <input type="text" placeholder="Plan" value={plan} onChange={(e) => setPlan(e.target.value)} disabled={isSaving} />
+                <select value={colorAf} onChange={(e) => setColorAf(e.target.value)} disabled={isSaving}>
                   <option value="amarillo">🟨 Amarillo</option>
                   <option value="azul">🟦 Azul</option>
                 </select>
-                <button onClick={agregarAfiliado}>➕ Agregar</button>
+                <button onClick={agregarAfiliado} disabled={isSaving}>
+                  {isSaving ? 'Guardando...' : '➕ Agregar'}
+                </button>
               </div>
 
               <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
@@ -183,7 +273,7 @@
                         <small>{af.email}</small><br/>
                         <small>Plan: {af.plan}</small>
                       </div>
-                      <button className="btn-delete" onClick={() => eliminarAfiliado(af.id)}>🗑️ Eliminar</button>
+                      <button className="btn-delete" onClick={() => eliminarAfiliado(af.id)} disabled={isSaving}>🗑️ Eliminar</button>
                     </div>
                   </div>
                 ))}
@@ -200,18 +290,20 @@
 
               <div className="form-container">
                 <h3>Registrar Prestación</h3>
-                <select value={afiliadoSel} onChange={(e) => setAfiliadoSel(e.target.value)}>
+                <select value={afiliadoSel} onChange={(e) => setAfiliadoSel(e.target.value)} disabled={isSaving}>
                   <option value="">Seleccionar Afiliado</option>
                   {afiliados.map(af => <option key={af.id} value={af.id}>{af.nombre}</option>)}
                 </select>
-                <input type="text" placeholder="Tipo de prestación" value={tipo} onChange={(e) => setTipo(e.target.value)} />
-                <input type="text" placeholder="Doctor" value={doctor} onChange={(e) => setDoctor(e.target.value)} />
-                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-                <select value={colorPr} onChange={(e) => setColorPr(e.target.value)}>
+                <input type="text" placeholder="Tipo de prestación" value={tipo} onChange={(e) => setTipo(e.target.value)} disabled={isSaving} />
+                <input type="text" placeholder="Doctor" value={doctor} onChange={(e) => setDoctor(e.target.value)} disabled={isSaving} />
+                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} disabled={isSaving} />
+                <select value={colorPr} onChange={(e) => setColorPr(e.target.value)} disabled={isSaving}>
                   <option value="amarillo">🟨 Amarillo</option>
                   <option value="azul">🟦 Azul</option>
                 </select>
-                <button onClick={agregarPrestacion}>➕ Registrar</button>
+                <button onClick={agregarPrestacion} disabled={isSaving}>
+                  {isSaving ? 'Guardando...' : '➕ Registrar'}
+                </button>
               </div>
 
               <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
@@ -221,9 +313,9 @@
                       <div>
                         <strong>{afiliados.find(a => a.id === pr.afiliadoId)?.nombre}</strong><br/>
                         <small>{pr.tipo} - {pr.doctor}</small><br/>
-                        <small>{new Date(pr.fecha).toLocaleDateString('es-AR')}</small>
+                        <small>{pr.fecha ? new Date(pr.fecha).toLocaleDateString('es-AR', {timeZone: 'UTC'}) : 'Sin fecha'}</small>
                       </div>
-                      <button className="btn-delete" onClick={() => eliminarPrestacion(pr.id)}>🗑️ Eliminar</button>
+                      <button className="btn-delete" onClick={() => eliminarPrestacion(pr.id)} disabled={isSaving}>🗑️ Eliminar</button>
                     </div>
                   </div>
                 ))}
