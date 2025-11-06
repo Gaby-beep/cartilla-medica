@@ -1,14 +1,6 @@
 {
   "nombre": "Juan Perez",
   "prestacion": "Odontología",
-  "afiliados": [
-    {
-      "id": 1762454182221,
-      "nombre": "faa",
-      "email": "fafafa",
-      "plan": "Básico",
-      "color": "amarillo"
-    }
-  ],
+  "afiliados": [],
   "prestaciones": []
 }
