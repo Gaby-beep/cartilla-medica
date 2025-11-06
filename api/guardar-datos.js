@@ -29,12 +29,17 @@ export default async function handler(request, response) {
       fileSha = fileData.sha;
       try {
         const fileContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
-        datosActuales = JSON.parse(fileContent);
+        // Evitar que un archivo vacío rompa el JSON.parse
+        if (fileContent) {
+          datosActuales = JSON.parse(fileContent);
+        }
       } catch (e) {
         console.log("JSON vacío o corrupto, iniciando de nuevo.");
       }
     } else if (getFileResponse.status !== 404) {
       // Si no es "No Encontrado", es un error real
+      const errorData = await getFileResponse.json();
+      console.error('Error al obtener archivo de GitHub:', errorData);
       throw new Error(`Error al obtener el archivo: ${getFileResponse.statusText}`);
     }
     // Si es 404, simplemente usamos datosActuales vacío y fileSha=null
@@ -96,6 +101,7 @@ export default async function handler(request, response) {
 
     if (!putResponse.ok) {
       const errorData = await putResponse.json();
+      console.error('Error al guardar en GitHub:', errorData);
       throw new Error(`Error al guardar en GitHub: ${putResponse.statusText} - ${errorData.message}`);
     }
 
@@ -103,7 +109,8 @@ export default async function handler(request, response) {
     response.status(200).json({ message: 'Datos guardados con éxito', data });
 
   } catch (error) {
-    console.error(error);
+    console.error('Error completo en handler:', error);
     response.status(500).json({ message: 'Error interno del servidor', error: error.message });
   }
 }
+   
